@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="The final work product for A Machine-Learning Interface for NiMARE, a Google Summer of Code 2026 project with INCF and NiMARE.">
+    <meta name="theme-color" content="#f7faf9">
+    <title>A Machine-Learning Interface for NiMARE</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+      <nav class="site-nav shell" aria-label="Main navigation">
+        <a class="brand" href="#top" aria-label="NiMARE machine-learning interface home">
+          <span class="brand-mark" aria-hidden="true">N</span>
+          <span>NiMARE · GSoC 2026</span>
+        </a>
+        <div class="nav-links">
+          <a href="#overview">Overview</a>
+          <a href="#contributions">Contributions</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#engineering">Engineering</a>
+          <a href="#deliverables">Deliverables</a>
+          <a href="#future-work">Future Work</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" id="top" aria-labelledby="page-title">
+        <div class="hero-grid shell">
+          <div class="hero-copy">
+            <p class="eyebrow">Google Summer of Code 2026 · INCF · NiMARE</p>
+            <h1 id="page-title">A Machine-Learning Interface for NiMARE</h1>
+            <div class="people" aria-label="Project contributor and mentor">
+              <p><span>Contributor</span> [Your Name]</p>
+              <p><span>Mentor</span> James [Surname]</p>
+            </div>
+            <div class="hero-links" aria-label="Project links">
+              <span class="button placeholder">Main Pull Request</span>
+              <span class="button placeholder">NiMARE Repository</span>
+              <span class="button placeholder">GSoC Project</span>
+              <span class="button placeholder">Documentation</span>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-label="Studyset to machine-learning feature transformation illustration">
+            <div class="visual-label">Studyset</div>
+            <div class="matrix" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="visual-arrow" aria-hidden="true">→</div>
+            <div class="feature-stack" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="visual-label align-right">ML features</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell prose-section" id="overview" aria-labelledby="overview-title">
+        <div class="section-heading">
+          <p class="section-number">01</p>
+          <div>
+            <p class="kicker">Project Overview</p>
+            <h2 id="overview-title">A reliable bridge from meta-analysis to machine learning</h2>
+          </div>
+        </div>
+        <div class="measure lead-copy">
+          <p>NiMARE is an open-source Python library for performing neuroimaging meta-analysis. It provides tools for coordinate-based and image-based meta-analysis, annotation, decoding, and reproducible workflows built around structured collections of studies and analyses. Its <code>Studyset</code> representation brings together information such as activation coordinates, statistical images, metadata, and annotations.</p>
+          <p>Although these data are naturally useful for predictive modeling, moving from a NiMARE <code>Studyset</code> to a machine-learning experiment previously required substantial custom code. Researchers had to generate modeled activation maps, convert them into feature matrices, align metadata and prediction targets, preserve study identifiers, design leakage-safe splits, and manually connect the result to scikit-learn.</p>
+          <p>The goal of this project was to create a consistent bridge between NiMARE and the wider Python machine-learning ecosystem. The resulting interface converts meta-analytic data into a structured, scikit-learn-compatible representation while retaining the scientific context needed for responsible model evaluation.</p>
+          <p>The workflow is centered on two new abstractions: <code>MAFeatureExtractor</code>, which converts a <code>Studyset</code> into machine-learning features, and <code>MAFeatureDataset</code>, which stores those features together with targets, grouping labels, feature metadata, and provenance. Supporting utilities provide grouped cross-validation, sparse-compatible dimensionality reduction, and direct export to scikit-learn.</p>
+          <p>Rather than implementing a separate machine-learning framework inside NiMARE, the project gives researchers a reliable path into existing scikit-learn estimators, pipelines, model-selection tools, and evaluation functions.</p>
+        </div>
+      </section>
+
+      <section class="section tinted" id="motivation" aria-labelledby="motivation-title">
+        <div class="shell">
+          <div class="section-heading">
+            <p class="section-number">02</p>
+            <div>
+              <p class="kicker">Problem and Motivation</p>
+              <h2 id="motivation-title">Scientific data needs a scientific data contract</h2>
+            </div>
+          </div>
+
+          <div class="problem-layout">
+            <div class="problem-copy">
+              <p>A neuroimaging meta-analytic dataset is not immediately equivalent to a conventional machine-learning table. A single analysis may contain a set of reported coordinates rather than a fixed-length feature vector. Several analyses may originate from the same study, and therefore cannot be treated as statistically independent observations. Metadata and annotations may exist at different levels, use different types, or contain missing values. The resulting brain maps are also extremely high-dimensional.</p>
+              <p>Before this project, researchers could generate modeled activation maps with NiMARE kernel transformers, but there was no unified interface for turning those maps into an aligned dataset suitable for scikit-learn. Each downstream project had to make its own decisions about row identity, feature order, sparse storage, outcome extraction, and data splitting.</p>
+              <p>This fragmentation created both engineering overhead and scientific risk.</p>
+              <p>The most serious risk was data leakage. If two analyses from the same publication were randomly assigned to different folds, the model could learn study-specific characteristics from the training data and encounter closely related information during testing. The resulting evaluation score could appear stronger than the model’s real ability to generalize to unseen studies.</p>
+              <p>Memory usage presented another challenge. A modeled activation map may contain tens or hundreds of thousands of voxels. Storing one dense map for every analysis can quickly become impractical, even though these maps are often highly sparse. Any general solution therefore needed to preserve sparse representations until a researcher explicitly selected a reduction method.</p>
+              <p>The interface also needed to handle heterogeneous data without hiding important assumptions. Numeric metadata can be appended directly to a feature matrix, but free text, categorical descriptors, or multi-label annotations require an explicit encoding strategy. Automatically transforming these fields would make the API convenient at the cost of making the scientific workflow less transparent.</p>
+              <p>The project addressed these problems by defining a clear data contract: one row per retained analysis, stable row alignment, explicit study-level groups, sparse voxelwise features, optional descriptors and targets, and recorded provenance.</p>
+            </div>
+
+            <aside class="concerns" aria-label="Major engineering and scientific concerns">
+              <div class="concern">
+                <span>01</span>
+                <p>Study-level data leakage</p>
+              </div>
+              <div class="concern">
+                <span>02</span>
+                <p>High-dimensional sparse neuroimaging maps</p>
+              </div>
+              <div class="concern">
+                <span>03</span>
+                <p>Heterogeneous metadata</p>
+              </div>
+              <div class="concern">
+                <span>04</span>
+                <p>Lack of a standardized path from NiMARE to scikit-learn</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell" id="contributions" aria-labelledby="built-title">
+        <div class="section-heading">
+          <p class="section-number">03</p>
+          <div>
+            <p class="kicker">What I Built</p>
+            <h2 id="built-title">A compact interface with clear responsibilities</h2>
+          </div>
+        </div>
+
+        <div class="component-grid">
+          <article class="component component-wide">
+            <div class="component-topline"><code>MAFeatureDataset</code><span>Data contract</span></div>
+            <p><code>MAFeatureDataset</code> is the central data container introduced by the project. It stores the feature matrix together with all of the information required to interpret and safely use its rows:</p>
+            <ul class="compact-list">
+              <li>analysis identifiers;</li>
+              <li>study identifiers used as grouping labels;</li>
+              <li>map-derived and descriptor-derived features;</li>
+              <li>optional prediction targets;</li>
+              <li>feature names and column boundaries;</li>
+              <li>map-generation and source provenance.</li>
+            </ul>
+            <p>The class validates row and column alignment during construction. Identifiers, study groups, targets, map features, and descriptors must all refer to the same observations and appear in the same order. This catches alignment errors at the boundary of the workflow instead of allowing them to silently affect a later model.</p>
+            <p>The container also distinguishes map columns from descriptor columns. This is important because voxelwise features and tabular descriptors generally require different preprocessing. A researcher can reduce the map features while passing descriptor columns through unchanged.</p>
+            <p>Copying and row slicing preserve the complete dataset structure, including targets and provenance. Unreduced voxelwise maps remain sparse, protecting the workflow from accidental memory expansion.</p>
+          </article>
+
+          <article class="component component-wide">
+            <div class="component-topline"><code>MAFeatureExtractor</code><span>Studyset conversion</span></div>
+            <p><code>MAFeatureExtractor</code> handles conversion from a NiMARE <code>Studyset</code> to an <code>MAFeatureDataset</code>. It uses an explicitly selected NiMARE kernel transformer to generate modeled activation maps and represents each retained analysis as a row.</p>
+            <p>The extractor can read selected fields from Studyset metadata or annotations. Numeric fields can become additional descriptor features, while a selected scalar field can become the prediction target. All values are aligned to the original analysis identifiers before rows are retained or removed.</p>
+            <p>Analyses without coordinates can be handled through an explicit policy. In <code>drop</code> mode, they are excluded and their identifiers are recorded in the dataset provenance. In <code>include</code> mode, they remain in the dataset as all-zero sparse map rows. This makes the treatment of incomplete coordinate data visible and reproducible.</p>
+            <p>Map generation can also be cached. Repeated experiments with different downstream estimators or reduction parameters do not need to regenerate identical modeled activation maps when the Studyset, mask, coordinates, metadata, and kernel configuration remain unchanged.</p>
+          </article>
+
+          <article class="component">
+            <div class="component-topline"><code>to_sklearn()</code><span>Export</span></div>
+            <p>An <code>MAFeatureDataset</code> can be exported through <code>to_sklearn()</code>. The method returns a familiar scikit-learn <code>Bunch</code> containing:</p>
+            <ul class="compact-list">
+              <li><code>data</code>, the aligned feature matrix;</li>
+              <li><code>target</code>, the optional prediction outcome;</li>
+              <li><code>groups</code>, the study identifiers;</li>
+              <li><code>feature_names</code>;</li>
+              <li><code>map_columns</code>;</li>
+              <li><code>descriptor_columns</code>.</li>
+            </ul>
+            <p>This design keeps responsibilities clear. The extractor consumes domain-specific NiMARE data and produces a structured dataset; the dataset exports the data it already owns. NiMARE does not train the predictive model itself. Once exported, the result can be used with standard scikit-learn estimators and evaluation utilities.</p>
+          </article>
+
+          <article class="component">
+            <div class="component-topline"><span class="code-label">Grouped splitting</span><span>Evaluation</span></div>
+            <p><code>MAFeatureDataset.make_cv()</code> constructs cross-validation strategies that are already bound to the dataset’s study groups. It supports grouped folds through <code>GroupKFold</code> and reproducible grouped shuffle splits through <code>GroupShuffleSplit</code>.</p>
+            <p>Because the grouping information is carried by the dataset, users do not need to manually rebuild it whenever they evaluate a model. The helper also detects cases where the requested number of folds exceeds the number of unique studies and raises a clear error.</p>
+          </article>
+
+          <article class="component">
+            <div class="component-topline"><span class="code-label">Map reduction</span><span>Preprocessing</span></div>
+            <p>The project includes a sparse-compatible truncated singular value decomposition pathway for reducing high-dimensional activation maps. <code>make_preprocessor()</code> creates an unfitted scikit-learn <code>ColumnTransformer</code> that applies reduction only to map columns and passes descriptor columns through unchanged.</p>
+            <p>Crucially, this preprocessor is designed to be placed inside a scikit-learn pipeline. During cross-validation, the reducer is fitted only on the training fold and then applied to the held-out fold. Dimensionality reduction therefore does not leak information across the evaluation boundary.</p>
+          </article>
+
+          <article class="component">
+            <div class="component-topline"><span class="code-label">Examples and tests</span><span>Validation</span></div>
+            <p>A complete example demonstrates classification of n-back and flanker task analyses from a parquet-backed <code>Studyset</code>. It generates sparse modeled activation features with an <code>MKDAKernel</code>, extracts task labels, performs truncated-SVD reduction, trains logistic regression, and evaluates the pipeline using study-grouped cross-validation.</p>
+            <p>The implementation is supported by tests covering construction, validation, sparse data preservation, field extraction, target alignment, coordinate-missing policies, caching, copying, grouped cross-validation, reducer behavior, and the end-to-end Studyset conversion path.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section architecture-section" id="architecture" aria-labelledby="architecture-title">
+        <div class="shell">
+          <div class="section-heading light-heading">
+            <p class="section-number">04</p>
+            <div>
+              <p class="kicker">Architecture and End-to-End Workflow</p>
+              <h2 id="architecture-title">From scientific source data to model evaluation</h2>
+            </div>
+          </div>
+
+          <div class="workflow" role="img" aria-label="NiMARE Studyset flows through MAFeatureExtractor to modeled activation maps, selected descriptors and a target, then to MAFeatureDataset, study-grouped cross-validation, pipeline-safe map reduction, and a machine-learning model and evaluation.">
+            <div class="flow-node primary"><span>01</span><strong>NiMARE Studyset</strong></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-node"><span>02</span><strong>MAFeatureExtractor</strong></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-node wide"><span>03</span><strong>Modeled Activation Maps + Selected Descriptors + Target</strong></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-node"><span>04</span><strong>MAFeatureDataset</strong></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-node wide"><span>05</span><strong>Study-Grouped Cross-Validation</strong></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-node wide"><span>06</span><strong>Map Reduction inside a scikit-learn Pipeline</strong></div>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <div class="flow-node primary wide"><span>07</span><strong>Machine-Learning Model and Evaluation</strong></div>
+          </div>
+
+          <div class="architecture-copy">
+            <p>The <code>Studyset</code> remains the source of scientific data. <code>MAFeatureExtractor</code> performs domain-specific conversion, including map generation and row alignment. <code>MAFeatureDataset</code> becomes the stable boundary between NiMARE and scikit-learn. From that point onward, standard estimators, pipelines, scoring functions, and model-selection tools can be used.</p>
+            <p>This separation also makes the system extensible. New map-generation strategies can reuse the same dataset representation, while future reducers can be added without changing how Studysets are converted or how models consume the exported data.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell" id="engineering" aria-labelledby="engineering-title">
+        <div class="section-heading">
+          <p class="section-number">05</p>
+          <div>
+            <p class="kicker">Engineering Decisions and Challenges</p>
+            <h2 id="engineering-title">Designing for trustworthy evaluation</h2>
+          </div>
+        </div>
+
+        <div class="decisions">
+          <article class="decision">
+            <div class="decision-number">01</div>
+            <div>
+              <h3>Preventing study-level leakage</h3>
+              <p>The most important scientific decision was to treat an analysis as a machine-learning row while treating its parent study as the splitting group. A single study may report several analyses based on overlapping participants, acquisition procedures, or preprocessing decisions. Splitting those analyses independently would violate the assumptions behind held-out evaluation.</p>
+              <p>The interface therefore carries <code>study_ids</code> alongside every row and uses them in all provided cross-validation helpers. This makes leakage prevention a property of the dataset design instead of an optional convention left to each example.</p>
+            </div>
+          </article>
+
+          <article class="decision">
+            <div class="decision-number">02</div>
+            <div>
+              <h3>Preserving sparse, high-dimensional maps</h3>
+              <p>Voxelwise activation maps can be large, but most modeled activation values are zero. The implementation uses sparse matrices for unreduced map features and avoids implicit conversion to dense arrays. When descriptor columns are added, they are combined with the maps without densifying the full matrix.</p>
+              <p>Truncated SVD was selected as the first reduction path because it can operate directly on sparse input. Dense reduced components are acceptable after an explicit transformation because their dimensionality is controlled by the user.</p>
+            </div>
+          </article>
+
+          <article class="decision">
+            <div class="decision-number">03</div>
+            <div>
+              <h3>Separating conversion from model fitting</h3>
+              <p><code>MAFeatureExtractor</code> intentionally does not behave like a fitted scikit-learn estimator. It converts a domain-specific <code>Studyset</code>; it does not learn predictive parameters from <code>X</code> and <code>y</code>. Giving it <code>fit()</code> and <code>fit_transform()</code> methods would imply semantics that do not match its role.</p>
+              <p>Similarly, <code>to_sklearn()</code> belongs to <code>MAFeatureDataset</code>, because export is an operation on an object that already contains the aligned data. The resulting public workflow is explicit:</p>
+              <pre><code>dataset = extractor.transform(studyset)
+bunch = dataset.to_sklearn()</code></pre>
+              <p>This boundary keeps the API understandable and gives the dataset room to support additional export formats in the future.</p>
+            </div>
+          </article>
+
+          <article class="decision">
+            <div class="decision-number">04</div>
+            <div>
+              <h3>Maintaining row alignment</h3>
+              <p>Coordinates, maps, metadata, annotations, targets, and identifiers may originate from different tables. Removing an analysis from only one source can shift every subsequent row and quietly corrupt a model.</p>
+              <p>The implementation constructs retention masks from stable analysis identifiers and applies them consistently to every row-aligned component. Dataset construction then verifies the resulting dimensions. Tests include cases where Studyset table order differs from the apparent identifier order, ensuring that values remain attached to the correct analyses.</p>
+            </div>
+          </article>
+
+          <article class="decision">
+            <div class="decision-number">05</div>
+            <div>
+              <h3>Handling heterogeneous types explicitly</h3>
+              <p>Metadata and annotations can be numeric, categorical, textual, or multi-label. The interface currently supports direct numeric descriptor extraction and scalar target selection. Unsupported representations are intended to require an explicit transformer rather than being encoded through hidden defaults.</p>
+              <p>This is both an API decision and a reproducibility decision. Encoding categories, tokenizing abstracts, and defining multi-label outcomes are modeling choices that should be visible in the final pipeline.</p>
+            </div>
+          </article>
+
+          <article class="decision">
+            <div class="decision-number">06</div>
+            <div>
+              <h3>Avoiding preprocessing leakage</h3>
+              <p>A dimensionality reducer fitted before cross-validation has already observed the held-out data, even when it has not seen the target labels. The project therefore returns an unfitted preprocessor intended for use inside a scikit-learn pipeline. Each fold learns its reduction only from the corresponding training partition.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section tinted" id="deliverables" aria-labelledby="deliverables-title">
+        <div class="shell">
+          <div class="section-heading">
+            <p class="section-number">06</p>
+            <div>
+              <p class="kicker">Deliverables and Current Status</p>
+              <h2 id="deliverables-title">A clear view of the project’s current state</h2>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Deliverable</th>
+                  <th scope="col">Output</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Machine-learning data model</td>
+                  <td><code>MAFeatureDataset</code> with validation, provenance, copying, and feature partitions</td>
+                  <td><span class="status completed">Completed</span></td>
+                </tr>
+                <tr>
+                  <td>Studyset feature extraction</td>
+                  <td><code>MAFeatureExtractor</code> with sparse MA maps, descriptors, targets, missing-coordinate handling, and caching</td>
+                  <td><span class="status completed">Completed</span></td>
+                </tr>
+                <tr>
+                  <td>scikit-learn interoperability</td>
+                  <td><code>to_sklearn()</code> export using <code>Bunch</code></td>
+                  <td><span class="status completed">Completed</span></td>
+                </tr>
+                <tr>
+                  <td>Leakage-safe evaluation</td>
+                  <td>Study-bound grouped K-fold and grouped shuffle splitting</td>
+                  <td><span class="status completed">Completed</span></td>
+                </tr>
+                <tr>
+                  <td>Map preprocessing</td>
+                  <td>Pipeline-safe truncated-SVD reduction with descriptor passthrough</td>
+                  <td><span class="status completed">Completed</span></td>
+                </tr>
+                <tr>
+                  <td>Documentation example</td>
+                  <td>End-to-end n-back versus flanker classification workflow</td>
+                  <td><span class="status review">Completed / In Review</span></td>
+                </tr>
+                <tr>
+                  <td>Automated validation</td>
+                  <td>Unit and regression tests for alignment, sparsity, splitting, caching, and conversion</td>
+                  <td><span class="status review">Completed / In Review</span></td>
+                </tr>
+                <tr class="future-row">
+                  <td>Additional reducers</td>
+                  <td>Variance filtering and atlas-based aggregation</td>
+                  <td><span class="status future">Future Work</span></td>
+                </tr>
+                <tr class="future-row">
+                  <td>Advanced field handling</td>
+                  <td>User-provided vectorizers for text, categorical, and multi-label data</td>
+                  <td><span class="status future">Future Work</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="link-note">Code and discussion are available in <span class="text-placeholder">[Main Pull Request]</span>, with the implementation in <code>nimare/ml.py</code>, tests in <code>nimare/tests/test_ml.py</code>, and examples under <code>examples/05_machine_learning</code>.</p>
+        </div>
+      </section>
+
+      <section class="section shell" id="future-work" aria-labelledby="future-title">
+        <div class="section-heading">
+          <p class="section-number">07</p>
+          <div>
+            <p class="kicker">Future Work</p>
+            <h2 id="future-title">Extensions beyond the current implementation</h2>
+          </div>
+        </div>
+
+        <div class="future-panel">
+          <div class="future-flag">Future direction</div>
+          <div class="future-copy">
+            <p>The current implementation establishes the core data contract and an end-to-end sparse modeling workflow. Several extensions can build on this foundation.</p>
+            <p>The reduction API can be expanded with variance thresholding and atlas-based aggregation, allowing researchers to choose between voxel-level components and anatomically interpretable regional features. Text vectorizers and categorical encoders could support abstracts, titles, and richer annotations while preserving explicit control over how those values are transformed. Target transformers could similarly enable structured multi-label prediction tasks.</p>
+            <p>Further work could add benchmarking on large Studysets, richer missing-data diagnostics, feature-name propagation after reduction, and more examples covering regression, multimodal descriptors, and model interpretation. The interface could also support additional machine-learning ecosystems while retaining <code>MAFeatureDataset</code> as the shared representation.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section acknowledgement" id="acknowledgements" aria-labelledby="acknowledgements-title">
+        <div class="shell ack-grid">
+          <div class="section-heading light-heading">
+            <p class="section-number">08</p>
+            <div>
+              <p class="kicker">Acknowledgements and Links</p>
+              <h2 id="acknowledgements-title">Built with the open-source neuroinformatics community</h2>
+            </div>
+          </div>
+
+          <div class="ack-copy">
+            <p>This project was developed as part of Google Summer of Code 2026 with the International Neuroinformatics Coordinating Facility. I am especially grateful to James [Surname] for mentorship, technical guidance, and thoughtful API reviews. I also thank the NiMARE maintainers and contributor community for their feedback, and INCF and Google for supporting open-source neuroinformatics.</p>
+            <p>The project demonstrates how neuroimaging-specific data structures and general-purpose machine-learning tools can work together without sacrificing scientific context. By making grouping, sparsity, provenance, and preprocessing explicit, the interface turns NiMARE Studysets into a practical foundation for reproducible predictive modeling.</p>
+          </div>
+
+          <div class="footer-links" aria-label="Acknowledgement links">
+            <span class="footer-link placeholder">NiMARE Repository</span>
+            <span class="footer-link placeholder">Main Pull Request</span>
+            <span class="footer-link placeholder">NiMARE Documentation</span>
+            <span class="footer-link placeholder">GSoC Project Page</span>
+            <span class="footer-link placeholder">INCF</span>
+            <span class="footer-link placeholder">Contributor GitHub</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <p>A Machine-Learning Interface for NiMARE</p>
+        <p>Google Summer of Code 2026 · INCF · NiMARE</p>
+      </div>
+    </footer>
+  </body>
+</html>
