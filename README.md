@@ -24,10 +24,8 @@ experiments on real NeuroStore data.
   scikit-learn Pipeline on training data. Study groups are exposed for grouped
   splitting and cross-validation.
 - **Dimensionality reduction:** Added TruncatedSVD and atlas aggregation, including
-  support for continuous maps and discrete label atlases. 
-- **Tests and examples:** Added tests for dataset consistency, feature extraction,
-  missing coordinates, caching, and reducers, together with API documentation and
-  machine-learning examples.
+  support for continuous maps and discrete label atlases. Atlas aggregation processes features in batches to limit memory use.
+- **Tests and examples:** Added tests covering dataset consistency, copying, feature extraction, missing coordinates, cache reuse, reducers, and scikit-learn integration. Added API documentation and two real-data examples demonstrating grouped cross-validation for n-back versus flanker classification and a grouped holdout comparison between TruncatedSVD and DiFuMo.
 
 Implementation and review discussion:
 [NiMARE pull request #1148](https://github.com/neurostuff/NiMARE/pull/1148).
@@ -37,12 +35,8 @@ Implementation and review discussion:
 To exercise the interface on real data, I prepared a single-label task-classification
 subset from a neurostore studyset. Task names were normalized,
 equivalent variants were grouped into task families, multi-task studies were
-excluded, and only classes supported by at least 100 studies were retained.
-Derived datasets were created without overwriting the original Studyset.
-
-The prepared subset contains **15 task classes, 2,967 studies, and 11,005 analyses**
-before coordinate filtering. Its `studyset.json` records provenance, filtering
-details, and table hashes.
+excluded, and only classes supported by at least 100 studies were retained. The prepared subset contains **15 task classes, 2,967 studies, and 11,005 analyses**
+before coordinate filtering. 
 
 The current holdout script uses:
 
